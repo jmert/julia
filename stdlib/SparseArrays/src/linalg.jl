@@ -756,7 +756,10 @@ end
 
 # kron
 
-function kron(a::SparseMatrixCSC{Tv,Ti}, b::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+function kron(a::SparseMatrixCSC, b::SparseMatrixCSC)
+    Tv = promote_type(eltype(a), eltype(b))
+    Ti = promote_type(indtype(a), indtype(b))
+
     numnzA = nnz(a)
     numnzB = nnz(b)
 
@@ -811,18 +814,13 @@ function kron(a::SparseMatrixCSC{Tv,Ti}, b::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti
     SparseMatrixCSC(m, n, colptr, rowval, nzval)
 end
 
-function kron(A::SparseMatrixCSC{Tv1,Ti1}, B::SparseMatrixCSC{Tv2,Ti2}) where {Tv1,Ti1,Tv2,Ti2}
-    Tv_res = promote_type(Tv1, Tv2)
-    Ti_res = promote_type(Ti1, Ti2)
-    A = convert(SparseMatrixCSC{Tv_res,Ti_res}, A)
-    B = convert(SparseMatrixCSC{Tv_res,Ti_res}, B)
-    return kron(A,B)
-end
-
 kron(A::SparseMatrixCSC, B::VecOrMat) = kron(A, sparse(B))
 kron(A::VecOrMat, B::SparseMatrixCSC) = kron(sparse(A), B)
 
-function kron(x::SparseVector{Tv,Ti},y::SparseVector{Tv,Ti}) where {Tv,Ti}
+function kron(x::SparseVector, y::SparseVector)
+    Tv = promote_type(eltype(x), eltype(y))
+    Ti = promote_type(indtype(x), indtype(y))
+
     nnzx = nnz(x)
     nnzy = nnz(y)
     nnzz = nnzx*nnzy # number of nonzeros in new vector
@@ -836,16 +834,8 @@ function kron(x::SparseVector{Tv,Ti},y::SparseVector{Tv,Ti}) where {Tv,Ti}
     return SparseVector(x.n*y.n,nzind,nzval)
 end
 
-function kron(x::SparseVector{Tv1,Ti1}, y::SparseVector{Tv2,Ti2}) where {Tv1,Ti1,Tv2,Ti2}
-    Tv_res = promote_type(Tv1, Tv2)
-    Ti_res = promote_type(Ti1, Ti2)
-    x2 = convert(SparseVector{Tv_res,Ti_res}, x)
-    y2 = convert(SparseVector{Tv_res,Ti_res}, y)
-    return kron(x2,y2)
-end
-
-kron(x::SparseVector{Tv,Ti}, y::AbstractVector) where {Tv,Ti} = kron(x, sparse(y))
-kron(x::AbstractVector, y::SparseVector{Tv,Ti}) where {Tv,Ti} = kron(sparse(x), y)
+kron(x::SparseVector, y::AbstractVector) = kron(x, sparse(y))
+kron(x::AbstractVector, y::SparseVector) = kron(sparse(x), y)
 
 ## det, inv, cond
 
