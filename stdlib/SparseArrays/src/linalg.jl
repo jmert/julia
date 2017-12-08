@@ -837,6 +837,66 @@ end
 kron(x::SparseVector, y::AbstractVector) = kron(x, sparse(y))
 kron(x::AbstractVector, y::SparseVector) = kron(sparse(x), y)
 
+# kron - sparse outer product case
+
+# avoid adding new methods to standard nonzeros/nonzeroinds
+_outer_nonzeros(v::SparseVectorUnion) = nonzeros(v)
+_outer_nonzeroinds(v::SparseVectorUnion) = nonzeroinds(v)
+_outer_nonzeros(v::DenseVector) = v
+_outer_nonzeroinds(v::DenseVector) = indices(v, 1)
+_outer_nonzeros(v::ConjVector) = conj(nonzeros(parent(v)))
+_outer_nonzeroinds(v::ConjVector) = nonzeroinds(parent(v))
+
+function _sparse_outer(A, B)
+    rowvalA = _outer_nonzeroinds(A)
+    rowvalB = _outer_nonzeroinds(parent(B))
+    nzvalsA = _outer_nonzeros(A)
+    nzvalsB = _outer_nonzeros(parent(B))
+    nA = size(A, 1)
+    nB = size(parent(B), 1)
+
+    Tv = promote_type(eltype(nzvalsA), eltype(nzvalsB))
+    Ti = promote_type(eltype(rowvalA), eltype(rowvalB))
+
+    nnzA = length(rowvalA)
+    nnzB = length(rowvalB)
+    numnz = nnzA * nnzB
+
+    colptr = zeros(Ti, nB + 1)
+    rowval = Vector{Ti}(uninitialized, numnz)
+    nzvals = Vector{Tv}(uninitialized, numnz)
+
+    idx = 0
+    @inbounds colptr[1] = 1
+    @inbounds for jj in eachindex(rowvalB)
+        bval = nzvalsB[jj]
+        iszero(bval) && continue
+        col = rowvalB[jj]
+
+        for ii in eachindex(rowvalA)
+            idx += 1
+            aval = nzvalsA[ii]
+            iszero(aval) && continue
+            colptr[col+1] += 1
+            rowval[idx] = rowvalA[ii]
+            nzvals[idx] = aval * bval
+        end
+    end
+    cumsum!(colptr, colptr)
+
+    return SparseMatrixCSC(nA, nB, colptr, rowval, nzvals)
+end
+
+const SparseRowVectorUnion{T} = Union{RowVector{T,S}, RowVector{T,ConjVector{T,S}}} where {T,S<:Union{SparseVector{T},SparseColumnView{T}}}
+
+for f in (:*,:kron)
+    @eval begin
+        ($f)(A::AbstractVector, B::SparseRowVectorUnion) = _sparse_outer(A, B)
+        ($f)(A::SparseVectorUnion, B::RowVector) = _sparse_outer(A, B)
+        ($f)(A::SparseVectorUnion, B::SparseRowVectorUnion) = _sparse_outer(A, B)
+    end
+end
+
 ## det, inv, cond
 
 inv(A::SparseMatrixCSC) = error("The inverse of a sparse matrix can often be dense and can cause the computer to run out of memory. If you are sure you have enough memory, please convert your matrix to a dense matrix.")
