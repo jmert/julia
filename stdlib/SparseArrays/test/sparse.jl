@@ -315,6 +315,23 @@ end
         f = Diagonal(rand(5))
         @test Array(a*f) == Array(a)*f
         @test Array(f*b) == f*Array(b)
+        g = a[:, 1]
+        @test issparse(g * g')
+        @test issparse(g * Vector(g)')
+        @test issparse(Vector(g) * g')
+        @test kron(g, g') == g * g'
+        @test Array(g * g') == Array(g) * Array(g')
+        h = view(b, :, 2)
+        @test issparse(h * h')
+        @test issparse(h * Vector(h)')
+        @test issparse(Vector(h) * h')
+        @test kron(h, h') == h * h'
+        @test Array(h * h') == Array(h) * Array(h')
+        @test issparse(g * h')
+        @test issparse(h * g')
+        @test Array(g * h') == Array(g) * Array(h')
+        @test Array(h * g') == Array(h) * Array(g')
+        @test !issparse(Vector(g) * Vector(h)')
     end
 end
 
