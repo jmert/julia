@@ -1016,3 +1016,14 @@ function Base.cov(X::SparseMatrixCSC, vardim::Int=1; corrected::Bool=true)
     # scale with the sample size n or the corrected sample size n - 1
     return scale!(out, inv(n - corrected))
 end
+
+# lowrankupdate!
+
+function LinAlg.lowrankupdate!(A::SparseMatrixCSC, u::SparseVectorUnion,
+                               v::SparseVectorUnion)
+    # TODO: Figure out if A + u*v' can be done in place without a u*v' temporary
+    map!(+, A, A, u * v')
+end
+
+LinAlg.lowrankupdate(A::SparseMatrixCSC, u::SparseVectorUnion, v::SparseVectorUnion) =
+    LinAlg.lowrankupdate!(copy(A), u, v)
