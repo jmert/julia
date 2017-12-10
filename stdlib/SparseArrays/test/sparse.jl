@@ -321,7 +321,7 @@ end
         @test issparse(Vector(g) * g')
         @test kron(g, g') == g * g'
         @test Array(g * g') == Array(g) * Array(g')
-        h = view(b, :, 2)
+        h = view(sprand(Complex{Float64}, 10, 2, 0.5), :, 1)
         @test issparse(h * h')
         @test issparse(h * Vector(h)')
         @test issparse(Vector(h) * h')
