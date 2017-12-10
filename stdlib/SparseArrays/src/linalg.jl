@@ -839,27 +839,31 @@ kron(x::AbstractVector, y::SparseVector) = kron(sparse(x), y)
 
 # kron - sparse outer product case
 
-# avoid adding new methods to standard nonzeros/nonzeroinds
-_outer_nonzeros(v::SparseVectorUnion) = nonzeros(v)
-_outer_nonzeroinds(v::SparseVectorUnion) = nonzeroinds(v)
-_outer_nonzeros(v::DenseVector) = v
-_outer_nonzeroinds(v::DenseVector) = indices(v, 1)
-_outer_nonzeros(v::ConjVector) = conj(nonzeros(parent(v)))
-_outer_nonzeroinds(v::ConjVector) = nonzeroinds(parent(v))
+# reuse some of broadcast machinery to treat SparseVectorUnion types the same
+import .HigherOrderFns: storedinds, storedvals
+@inline storedinds(v::SparseColumnView) = nonzeroinds(v)
+@inline storedinds(v::RowVector) = storedinds(parent(v))
+@inline storedinds(v::DenseVector) = indices(v, 1)
+@inline storedinds(v::ConjVector) = storedinds(parent(v))
+@inline storedvals(v::SparseColumnView) = nonzeros(v)
+@inline storedvals(v::RowVector) = storedvals(parent(v))
+@inline storedvals(v::DenseVector) = v
+@inline storedvals(v::ConjVector) = ConjVector(storedvals(parent(v)))
 
-function _sparse_outer(A, B)
-    rowvalA = _outer_nonzeroinds(A)
-    rowvalB = _outer_nonzeroinds(parent(B))
-    nzvalsA = _outer_nonzeros(A)
-    nzvalsB = _outer_nonzeros(parent(B))
+# TODO: truly integrate into broadcasting - this should just be A .* B
+function _sparse_outer(A::AbstractVector, B::RowVector)
+    rowvalA = storedinds(A)
+    colvalB = storedinds(B)
+    nzvalsA = storedvals(A)
+    nzvalsB = storedvals(B)
     nA = size(A, 1)
     nB = size(parent(B), 1)
 
     Tv = promote_type(eltype(nzvalsA), eltype(nzvalsB))
-    Ti = promote_type(eltype(rowvalA), eltype(rowvalB))
+    Ti = promote_type(eltype(rowvalA), eltype(colvalB))
 
     nnzA = length(rowvalA)
-    nnzB = length(rowvalB)
+    nnzB = length(colvalB)
     numnz = nnzA * nnzB
 
     colptr = zeros(Ti, nB + 1)
@@ -868,10 +872,10 @@ function _sparse_outer(A, B)
 
     idx = 0
     @inbounds colptr[1] = 1
-    @inbounds for jj in eachindex(rowvalB)
+    @inbounds for jj in eachindex(colvalB)
         bval = nzvalsB[jj]
         iszero(bval) && continue
-        col = rowvalB[jj]
+        col = colvalB[jj]
 
         for ii in eachindex(rowvalA)
             idx += 1
