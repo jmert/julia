@@ -887,8 +887,6 @@ function _sparse_outer(A, B)
     return SparseMatrixCSC(nA, nB, colptr, rowval, nzvals)
 end
 
-const SparseRowVectorUnion{T} = Union{RowVector{T,S}, RowVector{T,ConjVector{T,S}}} where {T,S<:Union{SparseVector{T},SparseColumnView{T}}}
-
 for f in (:*,:kron)
     @eval begin
         ($f)(A::AbstractVector, B::SparseRowVectorUnion) = _sparse_outer(A, B)
