@@ -35,7 +35,7 @@ SparseVector(n::Integer, nzind::Vector{Ti}, nzval::Vector{Tv}) where {Tv,Ti} =
 const SparseColumnView{T}  = SubArray{T,1,<:SparseMatrixCSC,Tuple{Base.Slice{Base.OneTo{Int}},Int},false}
 const SparseVectorUnion{T} = Union{SparseVector{T}, SparseColumnView{T}}
 # Likewise for the transpose to row vectors
-const SparseRowVectorUnion{T} = Union{RowVector{T,S}, RowVector{T,ConjVector{T,S}}} where {T,S<:SparseVectorUnion{T}}
+const SparseRowVectorUnion{T} = Union{Adjoint{T,S},Transpose{T,S}} where {T,S<:SparseVectorUnion{T}}
 
 ### Basic properties
 

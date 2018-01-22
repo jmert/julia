@@ -837,68 +837,6 @@ end
 kron(x::SparseVector, y::AbstractVector) = kron(x, sparse(y))
 kron(x::AbstractVector, y::SparseVector) = kron(sparse(x), y)
 
-# kron - sparse outer product case
-
-# reuse some of broadcast machinery to treat SparseVectorUnion types the same
-import .HigherOrderFns: storedinds, storedvals
-@inline storedinds(v::SparseColumnView) = nonzeroinds(v)
-@inline storedinds(v::RowVector) = storedinds(parent(v))
-@inline storedinds(v::DenseVector) = indices(v, 1)
-@inline storedinds(v::ConjVector) = storedinds(parent(v))
-@inline storedvals(v::SparseColumnView) = nonzeros(v)
-@inline storedvals(v::RowVector) = storedvals(parent(v))
-@inline storedvals(v::DenseVector) = v
-@inline storedvals(v::ConjVector) = ConjVector(storedvals(parent(v)))
-
-# TODO: truly integrate into broadcasting - this should just be A .* B
-function _sparse_outer(A::AbstractVector, B::RowVector)
-    rowvalA = storedinds(A)
-    colvalB = storedinds(B)
-    nzvalsA = storedvals(A)
-    nzvalsB = storedvals(B)
-    nA = size(A, 1)
-    nB = size(parent(B), 1)
-
-    Tv = promote_type(eltype(nzvalsA), eltype(nzvalsB))
-    Ti = promote_type(eltype(rowvalA), eltype(colvalB))
-
-    nnzA = length(rowvalA)
-    nnzB = length(colvalB)
-    numnz = nnzA * nnzB
-
-    colptr = zeros(Ti, nB + 1)
-    rowval = Vector{Ti}(uninitialized, numnz)
-    nzvals = Vector{Tv}(uninitialized, numnz)
-
-    idx = 0
-    @inbounds colptr[1] = 1
-    @inbounds for jj in eachindex(colvalB)
-        bval = nzvalsB[jj]
-        iszero(bval) && continue
-        col = colvalB[jj]
-
-        for ii in eachindex(rowvalA)
-            idx += 1
-            aval = nzvalsA[ii]
-            iszero(aval) && continue
-            colptr[col+1] += 1
-            rowval[idx] = rowvalA[ii]
-            nzvals[idx] = aval * bval
-        end
-    end
-    cumsum!(colptr, colptr)
-
-    return SparseMatrixCSC(nA, nB, colptr, rowval, nzvals)
-end
-
-for f in (:*,:kron)
-    @eval begin
-        ($f)(A::AbstractVector, B::SparseRowVectorUnion) = _sparse_outer(A, B)
-        ($f)(A::SparseVectorUnion, B::RowVector) = _sparse_outer(A, B)
-        ($f)(A::SparseVectorUnion, B::SparseRowVectorUnion) = _sparse_outer(A, B)
-    end
-end
-
 ## det, inv, cond
 
 inv(A::SparseMatrixCSC) = error("The inverse of a sparse matrix can often be dense and can cause the computer to run out of memory. If you are sure you have enough memory, please convert your matrix to a dense matrix.")
@@ -1079,13 +1017,3 @@ function Base.cov(X::SparseMatrixCSC, vardim::Int=1; corrected::Bool=true)
     return scale!(out, inv(n - corrected))
 end
 
-# lowrankupdate!
-
-function LinAlg.lowrankupdate!(A::SparseMatrixCSC, u::SparseVectorUnion,
-                               v::SparseVectorUnion)
-    # TODO: Figure out if A + u*v' can be done in place without a u*v' temporary
-    map!(+, A, A, u * v')
-end
-
-LinAlg.lowrankupdate(A::SparseMatrixCSC, u::SparseVectorUnion, v::SparseVectorUnion) =
-    LinAlg.lowrankupdate!(copy(A), u, v)
