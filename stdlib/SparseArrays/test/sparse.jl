@@ -333,6 +333,7 @@ end
     for (m,n) in ((5,10), (13,8), (14,10))
         a = sprand(m, 5, 0.4); a_d = Matrix(a)
         b = sprand(n, 6, 0.3); b_d = Matrix(b)
+        v = view(a, :, 2); v_d = Vector(v)
         x = sprand(m, 0.4); x_d = Vector(x)
         y = sprand(n, 0.3); y_d = Vector(y)
         # mat ⊗ mat
@@ -345,7 +346,11 @@ end
         @test Vector(kron(x, y_d)) == kron(x_d, y_d)
         # vec ⊗ vec'
         @test issparse(kron(x, y'))
+        @test issparse(kron(v, y'))
+        @test issparse(kron(y, v'))
         @test Array(kron(x, y')) == kron(x_d, y_d')
+        @test Array(kron(v, y')) == kron(v_d, y_d')
+        @test Array(kron(y, v')) == kron(y_d, v_d')
         # mat ⊗ vec
         @test Array(kron(a, y)) == kron(a_d, y_d)
         @test Array(kron(a_d, y)) == kron(a_d, y_d)

@@ -1191,8 +1191,8 @@ function kron(x::SparseVector{T1,S1}, y::SparseVector{T2,S2}) where {T1,S1,T2,S2
 end
 
 # sparse vector ⊗ sparse vector adjoint/transpose
-const AdjOrTransSparseVec{T,S} = LinearAlgebra.AdjOrTrans{T, SparseVector{T,S}} where {T,S}
-function kron(x::SparseVector{T1,S1}, y::AdjOrTransSparseVec{T2,S2}) where {T1,S1,T2,S2}
+const AdjOrTransSparseVecUnion{T} = LinearAlgebra.AdjOrTrans{T, <:SparseVectorUnion{T}}
+function kron(x::SparseVectorUnion{T1}, y::AdjOrTransSparseVecUnion{T2}) where {T1,T2}
     w = parent(y)
     nx = length(x)
     nw = length(w)
@@ -1200,12 +1200,12 @@ function kron(x::SparseVector{T1,S1}, y::AdjOrTransSparseVec{T2,S2}) where {T1,S
     rowvalw = nonzeroinds(w)
     nzvalsx = nonzeros(x)
     nzvalsw = nonzeros(w)
-    nnzx = nnz(x)
-    nnzw = nnz(w)
+    nnzx = length(nzvalsx)
+    nnzw = length(nzvalsw)
 
     nnzC = nnzx * nnzw
     Tv = promote_type(T1, T2)
-    Ti = typeof(one(S1) * one(S2))
+    Ti = promote_type(eltype(rowvalx), eltype(rowvalw))
     colptrC = zeros(Ti, nw + 1)
     rowvalC = Vector{Ti}(undef, nnzC)
     nzvalsC = Vector{Tv}(undef, nnzC)
