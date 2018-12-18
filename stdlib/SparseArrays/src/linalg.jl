@@ -1190,6 +1190,49 @@ function kron(x::SparseVector{T1,S1}, y::SparseVector{T2,S2}) where {T1,S1,T2,S2
     return SparseVector(x.n*y.n, nzind, nzval)
 end
 
+# sparse vector ⊗ sparse vector adjoint/transpose
+const AdjOrTransSparseVec{T,S} = LinearAlgebra.AdjOrTrans{T, SparseVector{T,S}} where {T,S}
+function kron(x::SparseVector{T1,S1}, y::AdjOrTransSparseVec{T2,S2}) where {T1,S1,T2,S2}
+    w = parent(y)
+    nx = length(x)
+    nw = length(w)
+    rowvalx = nonzeroinds(x)
+    rowvalw = nonzeroinds(w)
+    nzvalsx = nonzeros(x)
+    nzvalsw = nonzeros(w)
+    nnzx = nnz(x)
+    nnzw = nnz(w)
+
+    nnzC = nnzx * nnzw
+    Tv = promote_type(T1, T2)
+    Ti = typeof(one(S1) * one(S2))
+    colptrC = zeros(Ti, nw + 1)
+    rowvalC = Vector{Ti}(undef, nnzC)
+    nzvalsC = Vector{Tv}(undef, nnzC)
+
+    idx = 0
+    @inbounds colptrC[1] = 1
+    @inbounds for jj = 1:nnzw
+        wval = nzvalsw[jj]
+        iszero(wval) && continue
+        col = rowvalw[jj]
+        # TODO: Is there a better way of handling this?
+        wval = y isa Adjoint ? conj(wval) : wval
+
+        for ii = 1:nnzx
+            xval = nzvalsx[ii]
+            iszero(xval) && continue
+            idx += 1
+            colptrC[col+1] += 1
+            rowvalC[idx] = rowvalx[ii]
+            nzvalsC[idx] = xval * wval
+        end
+    end
+    cumsum!(colptrC, colptrC)
+
+    return SparseMatrixCSC(nx, nw, colptrC, rowvalC, nzvalsC)
+end
+
 # sparse matrix ⊗ sparse vector & vice versa
 kron(A::SparseMatrixCSC, x::SparseVector) = kron(A, SparseMatrixCSC(x))
 kron(x::SparseVector, A::SparseMatrixCSC) = kron(SparseMatrixCSC(x), A)

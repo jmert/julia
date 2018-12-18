@@ -343,6 +343,9 @@ end
         @test Vector(kron(x, y)) == kron(x_d, y_d)
         @test Vector(kron(x_d, y)) == kron(x_d, y_d)
         @test Vector(kron(x, y_d)) == kron(x_d, y_d)
+        # vec ⊗ vec'
+        @test issparse(kron(x, y'))
+        @test Array(kron(x, y')) == kron(x_d, y_d')
         # mat ⊗ vec
         @test Array(kron(a, y)) == kron(a_d, y_d)
         @test Array(kron(a_d, y)) == kron(a_d, y_d)
