@@ -1733,3 +1733,47 @@ ccall_lazy_lib_name(x) = ccall((:testUcharX, compute_lib_name()), Int32, (UInt8,
 @test ccall_lazy_lib_name(3) == 1
 ccall_with_undefined_lib() = ccall((:time, xx_nOt_DeFiNeD_xx), Cint, (Ptr{Cvoid},), C_NULL)
 @test_throws UndefVarError(:xx_nOt_DeFiNeD_xx) ccall_with_undefined_lib()
+
+# issue 33413
+@testset "cglobal lowering" begin
+    # crash in cglobal33413_ptrinline[_notype]() specifically requires the library pointer be
+    # retrieved inside the function; using global pointer variable doesn't trigger the crash
+    function cglobal33413_ptrvar()
+        libh = Libdl.dlopen(libccalltest)
+        sym = Libdl.dlsym(libh, :global_var)
+        return cglobal(sym, Cint)
+    end
+    function cglobal33413_ptrvar_notype()
+        libh = Libdl.dlopen(libccalltest)
+        sym = Libdl.dlsym(libh, :global_var)
+        return cglobal(sym)
+    end
+    function cglobal33413_ptrinline()
+        libh = Libdl.dlopen(libccalltest)
+        return cglobal(Libdl.dlsym(libh, :global_var), Cint)
+    end
+    function cglobal33413_ptrinline_notype()
+        libh = Libdl.dlopen(libccalltest)
+        return cglobal(Libdl.dlsym(libh, :global_var))
+    end
+    function cglobal33413_tupleliteral()
+        return cglobal((:global_var, libccalltest), Cint)
+    end
+    function cglobal33413_tupleliteral_notype()
+        return cglobal((:global_var, libccalltest))
+    end
+    function cglobal33413_literal()
+        return cglobal(:sin, Cint)
+    end
+    function cglobal33413_literal_notype()
+        return cglobal(:sin)
+    end
+    @test unsafe_load(cglobal33413_ptrvar()) == 1
+    @test unsafe_load(cglobal33413_ptrinline()) == 1
+    @test unsafe_load(cglobal33413_tupleliteral()) == 1
+    @test unsafe_load(convert(Ptr{Cint}, cglobal33413_ptrvar_notype())) == 1
+    @test unsafe_load(convert(Ptr{Cint}, cglobal33413_ptrinline_notype())) == 1
+    @test unsafe_load(convert(Ptr{Cint}, cglobal33413_tupleliteral_notype())) == 1
+    @test cglobal33413_literal() != C_NULL
+    @test cglobal33413_literal_notype() != C_NULL
+end
